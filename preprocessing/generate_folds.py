@@ -49,7 +49,7 @@ def parse_args():
     parser.add_argument("--root-dir", help="root directory", default="/mnt/sota/datasets/deepfake")
     parser.add_argument("--out", type=str, default="folds02.csv", help="CSV file to save")
     parser.add_argument("--seed", type=int, default=777, help="Seed to split, default 777")
-    parser.add_argument("--n_splits", type=int, default=16, help="Num folds, default 10")
+    parser.add_argument("--n_splits", type=int, default=1, help="Num folds, default 1")
     args = parser.parse_args()
 
     return args
@@ -58,20 +58,21 @@ def parse_args():
 def main():
     args = parse_args()
     ori_fakes = get_original_with_fakes(args.root_dir)
-    sz = 50 // args.n_splits
+    num_datas = 1
+    sz = num_datas // args.n_splits
     folds = []
     for fold in range(args.n_splits):
-        folds.append(list(range(sz * fold, sz * fold + sz if fold < args.n_splits - 1 else 50)))
+        folds.append(list(range(sz * fold, sz * fold + sz if fold < args.n_splits - 1 else num_datas)))
     print(folds)
     video_fold = {}
     for d in os.listdir(args.root_dir):
+        # if "videos" in d:
         if "dfdc" in d:
             part = int(d.split("_")[-1])
             for f in os.listdir(os.path.join(args.root_dir, d)):
                 if "metadata.json" in f:
                     with open(os.path.join(args.root_dir, d, "metadata.json")) as metadata_json:
                         metadata = json.load(metadata_json)
-
                     for k, v in metadata.items():
                         fold = None
                         for i, fold_dirs in enumerate(folds):

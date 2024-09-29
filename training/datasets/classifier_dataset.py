@@ -8,9 +8,13 @@ import cv2
 import numpy as np
 import pandas as pd
 import skimage.draw
+import albumentations
 from albumentations import ImageCompression, OneOf, GaussianBlur, Blur
-from albumentations.augmentations.functional import image_compression, rot90
-from albumentations.pytorch.functional import img_to_tensor
+# from albumentations.augmentations.functional import image_compression, rot90
+from albumentations.augmentations.functional import image_compression
+
+# from albumentations.pytorch.functional import img_to_tensor
+from albumentations.pytorch import ToTensorV2
 from scipy.ndimage import binary_erosion, binary_dilation
 from skimage import measure
 from torch.utils.data import Dataset
@@ -217,15 +221,15 @@ def blend_original(img):
 class DeepFakeClassifierDataset(Dataset):
 
     def __init__(self,
-                 data_path="/mnt/sota/datasets/deepfake",
-                 fold=0,
-                 label_smoothing=0.01,
-                 padding_part=3,
-                 hardcore=True,
-                 crops_dir="crops",
-                 folds_csv="folds.csv",
-                 normalize={"mean": [0.485, 0.456, 0.406],
-                            "std": [0.229, 0.224, 0.225]},
+                 data_path = "/mnt/sota/datasets/deepfake",
+                 fold = 0,
+                 label_smoothing = 0.01,
+                 padding_part = 3,
+                 hardcore = True,
+                 crops_dir = "crops",
+                 folds_csv = "folds.csv",
+                 normalize = {"mean": [0.485, 0.456, 0.406],
+                              "std": [0.229, 0.224, 0.225]},
                  rotation=False,
                  mode="train",
                  reduce_val=True,
@@ -247,6 +251,9 @@ class DeepFakeClassifierDataset(Dataset):
         self.df = pd.read_csv(self.folds_csv)
         self.oversample_real = oversample_real
         self.reduce_val = reduce_val
+        self.rot90 = albumentations.RandomRotate90(p = 1.0)
+        self.img_norm = albumentations.Normalize(mean = normalize['mean'], std = normalize['std'])
+        self.to_tensor = ToTensorV2()
 
     def __getitem__(self, index: int):
 
@@ -260,13 +267,17 @@ class DeepFakeClassifierDataset(Dataset):
                 image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
                 mask = np.zeros(image.shape[:2], dtype=np.uint8)
                 diff_path = os.path.join(self.data_root, "diffs", video, img_file[:-4] + "_diff.png")
-                try:
-                    msk = cv2.imread(diff_path, cv2.IMREAD_GRAYSCALE)
-                    if msk is not None:
-                        mask = msk
-                except:
-                    print("not found mask", diff_path)
-                    pass
+                if os.path.exists(diff_path):                    
+                    try:
+                        msk = cv2.imread(diff_path, cv2.IMREAD_GRAYSCALE)
+                        if msk is not None:
+                            mask = msk
+                    except:
+                        print("not found mask {}".format(diff_path))
+                        pass
+                else:
+                    print("not found mask {}".format(diff_path))
+                
                 if self.mode == "train" and self.hardcore and not self.rotation:
                     landmark_path = os.path.join(self.data_root, "landmarks", ori_video, img_file[:-4] + ".npy")
                     if os.path.exists(landmark_path) and random.random() < 0.7:
@@ -286,9 +297,11 @@ class DeepFakeClassifierDataset(Dataset):
                                 image *= np.expand_dims(bitmap_msk, axis=-1)
                                 break
                             current_try += 1
+                
                 if self.mode == "train" and self.padding_part > 3:
                     image = change_padding(image, self.padding_part)
                 valid_label = np.count_nonzero(mask[mask > 20]) > 32 or label < 0.5
+                
                 valid_label = 1 if valid_label else 0
                 rotation = 0
                 if self.transforms:
@@ -302,21 +315,24 @@ class DeepFakeClassifierDataset(Dataset):
                         dropout *= 0.7
                     elif random.random() < dropout:
                         blackout_random(image, mask, label)
-
                 #
                 # os.makedirs("../images", exist_ok=True)
                 # cv2.imwrite(os.path.join("../images", video+ "_" + str(1 if label > 0.5 else 0) + "_"+img_file), image[...,::-1])
 
                 if self.mode == "train" and self.rotation:
-                    rotation = random.randint(0, 3)
-                    image = rot90(image, rotation)
-
-                image = img_to_tensor(image, self.normalize)
+                    # rotation = random.randint(0, 3)
+                    # image = self.rot90(image, rotation)
+                    image = self.rot90(image = image)['image']
+                image = self.img_norm(image = image)['image']
+                image = self.to_tensor(image = image)['image']
+                # image = img_to_tensor(image, self.normalize)
                 return {"image": image, "labels": np.array((label,)), "img_name": os.path.join(video, img_file),
                         "valid": valid_label, "rotations": rotation}
             except Exception as e:
                 traceback.print_exc(file=sys.stdout)
                 print("Broken image", os.path.join(self.data_root, self.crops_dir, video, img_file))
+                with open('log.txt', 'a') as f:
+                    f.write("Broken image {}\n".format(os.path.join(self.data_root, self.crops_dir, video, img_file)))
                 index = random.randint(0, len(self.data) - 1)
 
     def random_blackout_landmark(self, image, mask, landmarks):
@@ -349,10 +365,12 @@ class DeepFakeClassifierDataset(Dataset):
     def _prepare_data(self, epoch, seed):
         df = self.df
         if self.mode == "train":
-            rows = df[df["fold"] != self.fold]
+            # rows = df[df["fold"] != self.fold]
+            rows = df[df["fold"] == self.fold]
         else:
             rows = df[df["fold"] == self.fold]
         seed = (epoch + 1) * seed
+
         if self.oversample_real:
             rows = self._oversample(rows, seed)
         if self.mode == "val" and self.reduce_val:
@@ -367,6 +385,7 @@ class DeepFakeClassifierDataset(Dataset):
 
         np.random.seed(seed)
         np.random.shuffle(data)
+        
         return data
 
     def _oversample(self, rows: pd.DataFrame, seed):

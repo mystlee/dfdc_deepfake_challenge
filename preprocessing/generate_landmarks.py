@@ -23,7 +23,7 @@ from facenet_pytorch.models.mtcnn import MTCNN
 import numpy as np
 
 detector = MTCNN(margin=0, thresholds=[0.65, 0.75, 0.75], device="cpu")
-
+# import pdb
 
 def save_landmarks(ori_id, root_dir):
     ori_id = ori_id[:-4]
@@ -33,6 +33,7 @@ def save_landmarks(ori_id, root_dir):
     for frame in range(320):
         if frame % 10 != 0:
             continue
+        # for actor in range(1):
         for actor in range(2):
             image_id = "{}_{}.png".format(frame, actor)
             landmarks_id = "{}_{}".format(frame, actor)
@@ -44,8 +45,10 @@ def save_landmarks(ori_id, root_dir):
                     image_ori = cv2.imread(ori_path, cv2.IMREAD_COLOR)[...,::-1]
                     frame_img = Image.fromarray(image_ori)
                     batch_boxes, conf, landmarks = detector.detect(frame_img, landmarks=True)
+                    
                     if landmarks is not None:
-                        landmarks = np.around(landmarks[0]).astype(np.int16)
+                        # landmarks = np.around(landmarks[0]).astype(np.int16)
+                        landmarks = np.around(np.asarray(landmarks[0], dtype = np.float64)).astype(np.int16)
                         np.save(landmark_path, landmarks)
                 except Exception as e:
                     print(e)

@@ -53,7 +53,7 @@ def create_train_transforms(size=300):
             IsotropicResize(max_side=size, interpolation_down=cv2.INTER_AREA, interpolation_up=cv2.INTER_LINEAR),
             IsotropicResize(max_side=size, interpolation_down=cv2.INTER_LINEAR, interpolation_up=cv2.INTER_LINEAR),
         ], p=1),
-        PadIfNeeded(min_height=size, min_width=size, border_mode=cv2.BORDER_CONSTANT),
+        PadIfNeeded(min_height=size, min_width=size, border_mode=cv2.BORDER_CONSTANT, value = 0.),
         OneOf([RandomBrightnessContrast(), FancyPCA(), HueSaturationValue()], p=0.7),
         ToGray(p=0.2),
         ShiftScaleRotate(shift_limit=0.1, scale_limit=0.2, rotate_limit=10, border_mode=cv2.BORDER_CONSTANT, p=0.5),
@@ -64,7 +64,7 @@ def create_train_transforms(size=300):
 def create_val_transforms(size=300):
     return Compose([
         IsotropicResize(max_side=size, interpolation_down=cv2.INTER_AREA, interpolation_up=cv2.INTER_CUBIC),
-        PadIfNeeded(min_height=size, min_width=size, border_mode=cv2.BORDER_CONSTANT),
+        PadIfNeeded(min_height=size, min_width=size, border_mode=cv2.BORDER_CONSTANT, value = 0.),
     ])
 
 
@@ -87,7 +87,8 @@ def main():
     arg('--from-zero', action='store_true', default=False)
     arg('--distributed', action='store_true', default=False)
     arg('--freeze-epochs', type=int, default=0)
-    arg("--local_rank", default=0, type=int)
+    # arg("--local_rank", default=0, type=int)
+    arg("--local-rank", default=0, type=int)
     arg("--seed", default=777, type=int)
     arg("--padding-part", default=3, type=int)
     arg("--opt-level", default='O1', type=str)
