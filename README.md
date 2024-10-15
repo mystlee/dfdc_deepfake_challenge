@@ -4,6 +4,8 @@
 
 [Kaggle Challenge Page](https://www.kaggle.com/c/deepfake-detection-challenge)
 
+## preprocessing example
+[colab page](https://colab.research.google.com/drive/1yKQ-YiyquvvfmWpckSvk_r5IqJXHZmkN#scrollTo=h-1xSqNc4DqX)
 
 ### Fake detection articles  
 - [The Deepfake Detection Challenge (DFDC) Preview Dataset](https://arxiv.org/abs/1910.08854)
